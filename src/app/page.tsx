@@ -66,10 +66,10 @@ function LoginPage({ onLogin }: { onLogin: (role: string, username: string) => v
 			<Card className="w-full max-w-md">
 				<CardHeader className="text-center">
 					<div className="mx-auto mb-4 flex w-auto items-center justify-center">
-						<Image src="/dbj-logo.jpg" alt="DBJ Logo" width={180} height={180} />
+						<Image src="/logo.svg" alt="IS Logo" width={100} height={100} />
 					</div>
-					<CardTitle className="text-2xl font-bold text-gray-900">DBJ Dashboard</CardTitle>
-					<CardDescription>Inici sesión para acceder a tu espacio de trabajo</CardDescription>
+					<CardTitle className="text-2xl font-bold text-gray-900">IS Dashboard</CardTitle>
+					<CardDescription>Inicia sesión para acceder a tu espacio de trabajo</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-5">
 					<div className="space-y-2">

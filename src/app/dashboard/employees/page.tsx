@@ -62,7 +62,7 @@ export default function EmployeeManagement() {
 			id: "1",
 			employeeId: "EMP001",
 			name: "John Doe",
-			email: "john.doe@dbj.com",
+			email: "john.doe@ingsimple.com",
 			phone: "+56 9 1234 5678",
 			department: "Ingeniería",
 			position: "Desarrollador Senior",
@@ -74,7 +74,7 @@ export default function EmployeeManagement() {
 			id: "2",
 			employeeId: "EMP002",
 			name: "Jane Smith",
-			email: "jane.smith@dbj.com",
+			email: "jane.smith@ingsimple.com",
 			phone: "+56 9 2345 6789",
 			department: "Marketing",
 			position: "Gerente de Marketing",
@@ -86,7 +86,7 @@ export default function EmployeeManagement() {
 			id: "3",
 			employeeId: "EMP003",
 			name: "Mike Johnson",
-			email: "mike.johnson@dbj.com",
+			email: "mike.johnson@ingsimple.com",
 			phone: "+56 9 3456 7890",
 			department: "Finanzas",
 			position: "Analista Financiero",
@@ -98,7 +98,7 @@ export default function EmployeeManagement() {
 			id: "4",
 			employeeId: "EMP004",
 			name: "Sarah Wilson",
-			email: "sarah.wilson@dbj.com",
+			email: "sarah.wilson@ingsimple.com",
 			phone: "+56 9 4567 8901",
 			department: "Recursos Humanos",
 			position: "Especialista en Recursos Humanos",
@@ -110,7 +110,7 @@ export default function EmployeeManagement() {
 			id: "5",
 			employeeId: "EMP005",
 			name: "David Brown",
-			email: "david.brown@dbj.com",
+			email: "david.brown@ingsimple.com",
 			phone: "+56 9 5678 9012",
 			department: "Ingeniería",
 			position: "Desarrollador Junior",
@@ -187,7 +187,7 @@ export default function EmployeeManagement() {
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor="email">Email</Label>
-									<Input id="email" type="email" placeholder="john.doe@dbj.com" />
+									<Input id="email" type="email" placeholder="john.doe@ingsimple.com" />
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor="phone">Teléfono</Label>

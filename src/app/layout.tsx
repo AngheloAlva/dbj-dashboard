@@ -7,7 +7,7 @@ import type { Metadata } from "next"
 const manrope = Manrope({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-	title: "DBJ Dashboard - Gestión de archivos & Sistemas de asistencia",
+	title: "IS Dashboard - Gestión de archivos & Sistemas de asistencia",
 	description: "Gestión de archivos y seguimiento de asistencia",
 }
 
