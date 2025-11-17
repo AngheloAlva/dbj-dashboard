@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,14 +19,19 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { DataGrid, DataGridContainer } from "@/components/ui/data-grid"
+import { DataGridPagination } from "@/components/ui/data-grid-pagination"
+import { DataGridTable } from "@/components/ui/data-grid-table"
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table"
+	ColumnDef,
+	getCoreRowModel,
+	getFilteredRowModel,
+	getPaginationRowModel,
+	getSortedRowModel,
+	PaginationState,
+	SortingState,
+	useReactTable,
+} from "@tanstack/react-table"
 import { Label } from "@/components/ui/label"
 import {
 	Select,
@@ -35,7 +40,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select"
-import { Users, UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, Calendar } from "lucide-react"
+import { Users, UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, Calendar, FileText, Upload, Download, Eye, X as XIcon } from "lucide-react"
 
 interface Employee {
 	id: string
@@ -50,12 +55,60 @@ interface Employee {
 	salary: string
 }
 
+interface EmployeeFile {
+	id: string
+	name: string
+	type: string
+	size: string
+	uploadDate: string
+	uploadedBy: string
+}
+
 export default function EmployeeManagement() {
 	// Handle the case where props or currentUser might be undefined during server-side rendering
 	const [searchQuery, setSearchQuery] = useState("")
 	const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
 	const [addEmployeeDialog, setAddEmployeeDialog] = useState(false)
 	const [editEmployeeDialog, setEditEmployeeDialog] = useState(false)
+	const [viewFilesDialog, setViewFilesDialog] = useState(false)
+	const [uploadFileDialog, setUploadFileDialog] = useState(false)
+	const [pagination, setPagination] = useState<PaginationState>({
+		pageIndex: 0,
+		pageSize: 5,
+	})
+	const [sorting, setSorting] = useState<SortingState>([])
+	
+	// Mock data para archivos de empleados
+	const [employeeFiles, setEmployeeFiles] = useState<Record<string, EmployeeFile[]>>({
+		"1": [
+			{
+				id: "f1",
+				name: "Contrato_JohnDoe.pdf",
+				type: "PDF",
+				size: "2.3 MB",
+				uploadDate: "2023-01-20",
+				uploadedBy: "Admin"
+			},
+			{
+				id: "f2",
+				name: "Certificado_Estudios.pdf",
+				type: "PDF",
+				size: "1.1 MB",
+				uploadDate: "2023-01-20",
+				uploadedBy: "RRHH"
+			}
+		],
+		"2": [
+			{
+				id: "f3",
+				name: "Contrato_JaneSmith.pdf",
+				type: "PDF",
+				size: "2.5 MB",
+				uploadDate: "2022-11-25",
+				uploadedBy: "Admin"
+			}
+		]
+	})
 
 	const mockEmployees: Employee[] = [
 		{
@@ -134,37 +187,238 @@ export default function EmployeeManagement() {
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "activo":
-				return "bg-green-100 text-green-800"
+				return "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800"
 			case "inactivo":
-				return "bg-red-100 text-red-800"
+				return "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400 border-red-200 dark:border-red-800"
 			case "en-licencia":
-				return "bg-yellow-100 text-yellow-800"
+				return "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800"
 			default:
-				return "bg-gray-100 text-gray-800"
+				return "bg-muted text-muted-foreground"
 		}
 	}
 
-	const departmentStats = [
-		{ name: "Ingeniería", count: 45, color: "bg-blue-100 text-blue-800" },
-		{ name: "Marketing", count: 23, color: "bg-purple-100 text-purple-800" },
-		{ name: "Finanzas", count: 18, color: "bg-green-100 text-green-800" },
-		{ name: "Recursos Humanos", count: 12, color: "bg-orange-100 text-orange-800" },
-	]
+	const getInitials = (name: string) => {
+		return name
+			.split(" ")
+			.map((n) => n[0])
+			.join("")
+			.toUpperCase()
+			.slice(0, 2)
+	}
 
 	// Safe role check with fallback for server-side rendering
 	const canManageEmployees = true
 
+	// Handlers memoizados para evitar re-renders innecesarios
+	const handleEditEmployee = useCallback((employee: Employee) => {
+		setSelectedEmployee(employee)
+		setEditEmployeeDialog(true)
+	}, [])
+
+	const handleViewFiles = useCallback((employee: Employee) => {
+		setSelectedEmployee(employee)
+		setViewFilesDialog(true)
+	}, [])
+
+	const columns = useMemo<ColumnDef<Employee>[]>(
+		() => [
+			{
+				accessorKey: "name",
+				header: "Colaborador",
+				cell: (info) => {
+					const employee = info.row.original
+					const initials = getInitials(employee.name)
+					return (
+						<div className="flex items-center gap-3">
+							<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+								{initials}
+							</div>
+							<div>
+								<p className="font-medium text-foreground">{employee.name}</p>
+								<p className="text-xs text-muted-foreground">{employee.employeeId}</p>
+							</div>
+						</div>
+					)
+				},
+				size: 200,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			{
+				accessorKey: "email",
+				header: "Contacto",
+				cell: (info) => {
+					const employee = info.row.original
+					return (
+						<div className="space-y-1">
+							<div className="flex items-center text-xs text-foreground">
+								<Mail className="mr-1.5 h-3 w-3 text-muted-foreground" />
+								{employee.email}
+							</div>
+							<div className="flex items-center text-xs text-foreground">
+								<Phone className="mr-1.5 h-3 w-3 text-muted-foreground" />
+								{employee.phone}
+							</div>
+						</div>
+					)
+				},
+				size: 200,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			{
+				accessorKey: "department",
+				header: "Departamento",
+				cell: (info) => <span className="text-foreground">{info.getValue() as string}</span>,
+				size: 150,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			{
+				accessorKey: "position",
+				header: "Posición",
+				cell: (info) => <span className="text-foreground">{info.getValue() as string}</span>,
+				size: 180,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			{
+				accessorKey: "status",
+				header: "Estado",
+				cell: (info) => {
+					const status = info.getValue() as string
+					return (
+						<Badge className={`${getStatusColor(status)} rounded-full border text-xs font-medium`}>
+							{status}
+						</Badge>
+					)
+				},
+				size: 120,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			{
+				accessorKey: "joinDate",
+				header: "Fecha de Inicio",
+				cell: (info) => {
+					const date = info.getValue() as string
+					return (
+						<div className="flex items-center text-foreground">
+							<Calendar className="mr-1.5 h-3 w-3 text-muted-foreground" />
+							<span>{date}</span>
+						</div>
+					)
+				},
+				size: 150,
+				meta: {
+					headerClassName: "",
+					cellClassName: "",
+				},
+			},
+			...(canManageEmployees
+				? [
+						{
+							id: "actions",
+							header: "Acciones",
+							cell: (info) => {
+								const employee = info.row.original
+								return (
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="ghost" size="sm" className="rounded-lg transition-all duration-150">
+												<MoreHorizontal className="h-4 w-4" />
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end">
+											<DropdownMenuItem
+												onSelect={(e) => {
+													e.preventDefault()
+													handleEditEmployee(employee)
+												}}
+											>
+												<Edit className="mr-2 h-4 w-4" />
+												Editar
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onSelect={(e) => {
+													e.preventDefault()
+													handleViewFiles(employee)
+												}}
+											>
+												<FileText className="mr-2 h-4 w-4" />
+												Gestionar Archivos
+											</DropdownMenuItem>
+											<DropdownMenuItem 
+												className="text-red-600 dark:text-red-400"
+												onSelect={(e) => {
+													e.preventDefault()
+													// Aquí iría la lógica para eliminar
+												}}
+											>
+												<Trash2 className="mr-2 h-4 w-4" />
+												Eliminar
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								)
+							},
+							size: 100,
+							meta: {
+								headerClassName: "",
+								cellClassName: "",
+							},
+						} as ColumnDef<Employee>,
+				  ]
+				: []),
+		],
+		[canManageEmployees, handleEditEmployee, handleViewFiles]
+	)
+
+	const table = useReactTable({
+		columns,
+		data: filteredEmployees,
+		pageCount: Math.ceil((filteredEmployees?.length || 0) / pagination.pageSize),
+		getRowId: (row: Employee) => row.id,
+		state: {
+			pagination,
+			sorting,
+		},
+		onPaginationChange: setPagination,
+		onSortingChange: setSorting,
+		getCoreRowModel: getCoreRowModel(),
+		getFilteredRowModel: getFilteredRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+	})
+
+	const departmentStats = [
+		{ name: "Ingeniería", count: 45, color: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-800" },
+		{ name: "Marketing", count: 23, color: "bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border-purple-200 dark:border-purple-800" },
+		{ name: "Finanzas", count: 18, color: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800" },
+		{ name: "Recursos Humanos", count: 12, color: "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400 border-orange-200 dark:border-orange-800" },
+	]
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-8">
 			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-3xl font-bold text-gray-900">Gestión de Colaboradores</h1>
-					<p className="text-gray-600">Gestionar información y registros de colaboradores</p>
+				<div className="space-y-2">
+					<h1 className="text-3xl font-bold text-foreground">Gestión de Colaboradores</h1>
+					<p className="text-muted-foreground">Gestionar información y registros de colaboradores</p>
 				</div>
 				{canManageEmployees && (
 					<Dialog open={addEmployeeDialog} onOpenChange={setAddEmployeeDialog}>
 						<DialogTrigger asChild>
-							<Button className="bg-blue-500 text-white">
+							<Button className="rounded-xl transition-all duration-150">
 								<UserPlus className="mr-2 h-4 w-4" />
 								Agregar Colaborador
 							</Button>
@@ -230,111 +484,58 @@ export default function EmployeeManagement() {
 			</div>
 
 			{/* Department Stats */}
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+			<div className="grid grid-cols-12 gap-6">
 				{departmentStats.map((dept, index) => (
-					<Card key={index}>
-						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">{dept.name}</CardTitle>
-							<Users className="text-muted-foreground h-4 w-4" />
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{dept.count}</div>
-							<Badge className={dept.color}>Activo</Badge>
-						</CardContent>
-					</Card>
+					<div key={index} className="col-span-12 md:col-span-6 lg:col-span-3">
+						<Card className="rounded-2xl border-muted shadow-sm transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+							<CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+								<div className="space-y-1 flex-1">
+									<CardTitle className="text-xs font-medium text-muted-foreground">{dept.name}</CardTitle>
+									<div className="text-2xl font-bold text-foreground">{dept.count}</div>
+								</div>
+								<Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+							</CardHeader>
+							<CardContent className="pt-0">
+								<Badge className={`${dept.color} rounded-full border text-xs font-medium`}>Activo</Badge>
+							</CardContent>
+						</Card>
+					</div>
 				))}
 			</div>
 
 			<Input
-				className="bg-white shadow"
+				className="border-muted rounded-xl"
 				placeholder="Buscar colaboradores por nombre, email, departamento, o ID..."
 				value={searchQuery}
 				onChange={(e) => setSearchQuery(e.target.value)}
 			/>
 
 			{/* Employee Table */}
-			<Card>
+			<Card className="rounded-2xl border-muted shadow-sm">
 				<CardHeader>
-					<CardTitle className="flex items-center">
+					<CardTitle className="flex items-center text-base font-semibold text-foreground">
 						<Users className="mr-2 h-5 w-5" />
-						Employee Directory
+						Directorio de Colaboradores
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Colaborador</TableHead>
-								<TableHead>Contacto</TableHead>
-								<TableHead>Departamento</TableHead>
-								<TableHead>Posición</TableHead>
-								<TableHead>Estado</TableHead>
-								<TableHead>Fecha de Inicio</TableHead>
-								{canManageEmployees && <TableHead>Acciones</TableHead>}
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{filteredEmployees.map((employee) => (
-								<TableRow key={employee.id}>
-									<TableCell>
-										<div>
-											<p className="font-medium">{employee.name}</p>
-											<p className="text-sm text-gray-500">{employee.employeeId}</p>
-										</div>
-									</TableCell>
-									<TableCell>
-										<div className="space-y-1">
-											<div className="flex items-center text-sm">
-												<Mail className="mr-1 h-3 w-3" />
-												{employee.email}
-											</div>
-											<div className="flex items-center text-sm">
-												<Phone className="mr-1 h-3 w-3" />
-												{employee.phone}
-											</div>
-										</div>
-									</TableCell>
-									<TableCell>{employee.department}</TableCell>
-									<TableCell>{employee.position}</TableCell>
-									<TableCell>
-										<Badge className={getStatusColor(employee.status)}>{employee.status}</Badge>
-									</TableCell>
-									<TableCell>
-										<div className="flex items-center text-sm">
-											<Calendar className="mr-1 h-3 w-3" />
-											{employee.joinDate}
-										</div>
-									</TableCell>
-									{canManageEmployees && (
-										<TableCell>
-											<DropdownMenu>
-												<DropdownMenuTrigger asChild>
-													<Button variant="ghost" size="sm">
-														<MoreHorizontal className="h-4 w-4" />
-													</Button>
-												</DropdownMenuTrigger>
-												<DropdownMenuContent align="end">
-													<DropdownMenuItem
-														onClick={() => {
-															setSelectedEmployee(employee)
-															setEditEmployeeDialog(true)
-														}}
-													>
-														<Edit className="mr-2 h-4 w-4" />
-														Edit
-													</DropdownMenuItem>
-													<DropdownMenuItem className="text-red-600">
-														<Trash2 className="mr-2 h-4 w-4" />
-														Delete
-													</DropdownMenuItem>
-												</DropdownMenuContent>
-											</DropdownMenu>
-										</TableCell>
-									)}
-								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+					<DataGrid
+						table={table}
+						recordCount={filteredEmployees?.length || 0}
+						tableLayout={{
+							stripped: true,
+							rowBorder: true,
+							headerBackground: true,
+							headerBorder: true,
+						}}
+					>
+						<div className="w-full space-y-2.5">
+							<DataGridContainer border={false}>
+								<DataGridTable />
+							</DataGridContainer>
+							<DataGridPagination />
+						</div>
+					</DataGrid>
 				</CardContent>
 			</Card>
 
@@ -412,6 +613,174 @@ export default function EmployeeManagement() {
 							</div>
 						</div>
 					)}
+				</DialogContent>
+			</Dialog>
+
+			{/* View Files Dialog */}
+			<Dialog open={viewFilesDialog} onOpenChange={setViewFilesDialog}>
+				<DialogContent className="max-w-3xl">
+					<DialogHeader>
+						<DialogTitle>Archivos del Colaborador</DialogTitle>
+						<DialogDescription>
+							{selectedEmployee && `Gestionar archivos de ${selectedEmployee.name}`}
+						</DialogDescription>
+					</DialogHeader>
+					{selectedEmployee && (
+						<div className="space-y-4">
+							<div className="flex justify-between items-center">
+								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+									<FileText className="h-4 w-4" />
+									<span>
+										{employeeFiles[selectedEmployee.id]?.length || 0} archivo(s) disponible(s)
+									</span>
+								</div>
+								<Button
+									size="sm"
+									onClick={() => {
+										setUploadFileDialog(true)
+									}}
+									className="rounded-lg"
+								>
+									<Upload className="mr-2 h-4 w-4" />
+									Subir Archivo
+								</Button>
+							</div>
+
+							<div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
+								{employeeFiles[selectedEmployee.id]?.length > 0 ? (
+									employeeFiles[selectedEmployee.id].map((file) => (
+										<div
+											key={file.id}
+											className="p-4 hover:bg-muted/50 transition-colors flex items-center justify-between"
+										>
+											<div className="flex items-center gap-3 flex-1">
+												<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+													<FileText className="h-5 w-5 text-primary" />
+												</div>
+												<div className="flex-1">
+													<p className="font-medium text-foreground">{file.name}</p>
+													<div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+														<span>{file.type}</span>
+														<span>•</span>
+														<span>{file.size}</span>
+														<span>•</span>
+														<span>Subido: {file.uploadDate}</span>
+														<span>•</span>
+														<span>Por: {file.uploadedBy}</span>
+													</div>
+												</div>
+											</div>
+											<div className="flex gap-2">
+												<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+													<Eye className="h-4 w-4" />
+												</Button>
+												<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+													<Download className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+													onClick={() => {
+														// Eliminar archivo
+														setEmployeeFiles((prev) => ({
+															...prev,
+															[selectedEmployee.id]: prev[selectedEmployee.id]?.filter(
+																(f) => f.id !== file.id
+															) || []
+														}))
+													}}
+												>
+													<Trash2 className="h-4 w-4" />
+												</Button>
+											</div>
+										</div>
+									))
+								) : (
+									<div className="p-8 text-center text-muted-foreground">
+										<FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+										<p>No hay archivos disponibles</p>
+										<p className="text-sm mt-1">Sube un archivo para comenzar</p>
+									</div>
+								)}
+							</div>
+						</div>
+					)}
+				</DialogContent>
+			</Dialog>
+
+			{/* Upload File Dialog */}
+			<Dialog open={uploadFileDialog} onOpenChange={setUploadFileDialog}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Subir Archivo</DialogTitle>
+						<DialogDescription>
+							Sube un nuevo archivo para {selectedEmployee?.name}
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4">
+						<div className="space-y-2">
+							<Label htmlFor="fileName">Nombre del Archivo</Label>
+							<Input id="fileName" placeholder="Ej: Contrato_Laboral.pdf" />
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="fileType">Tipo de Documento</Label>
+							<Select>
+								<SelectTrigger className="w-full">
+									<SelectValue placeholder="Seleccionar tipo" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="contract">Contrato</SelectItem>
+									<SelectItem value="certificate">Certificado</SelectItem>
+									<SelectItem value="identification">Identificación</SelectItem>
+									<SelectItem value="resume">Currículum</SelectItem>
+									<SelectItem value="other">Otro</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="fileUpload">Archivo</Label>
+							<div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+								<Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+								<p className="text-sm text-muted-foreground mb-1">
+									Haz clic para seleccionar o arrastra el archivo aquí
+								</p>
+								<p className="text-xs text-muted-foreground">PDF, DOC, DOCX hasta 10MB</p>
+								<Input id="fileUpload" type="file" className="hidden" />
+							</div>
+						</div>
+						<div className="flex justify-end space-x-2 pt-4">
+							<Button variant="outline" onClick={() => setUploadFileDialog(false)}>
+								Cancelar
+							</Button>
+							<Button
+								onClick={() => {
+									// Simular subida de archivo
+									if (selectedEmployee) {
+										const newFile: EmployeeFile = {
+											id: `f${Date.now()}`,
+											name: "Nuevo_Documento.pdf",
+											type: "PDF",
+											size: "1.5 MB",
+											uploadDate: new Date().toISOString().split('T')[0],
+											uploadedBy: "Usuario Actual"
+										}
+										setEmployeeFiles((prev) => ({
+											...prev,
+											[selectedEmployee.id]: [
+												...(prev[selectedEmployee.id] || []),
+												newFile
+											]
+										}))
+									}
+									setUploadFileDialog(false)
+								}}
+							>
+								<Upload className="mr-2 h-4 w-4" />
+								Subir Archivo
+							</Button>
+						</div>
+					</div>
 				</DialogContent>
 			</Dialog>
 		</div>
