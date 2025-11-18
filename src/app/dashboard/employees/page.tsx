@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,7 +40,21 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select"
-import { Users, UserPlus, MoreHorizontal, Edit, Trash2, Mail, Phone, Calendar, FileText, Upload, Download, Eye, X as XIcon } from "lucide-react"
+import {
+	Users,
+	UserPlus,
+	MoreHorizontal,
+	Edit,
+	Trash2,
+	Mail,
+	Phone,
+	Calendar,
+	FileText,
+	Upload,
+	Download,
+	Eye,
+	X as XIcon,
+} from "lucide-react"
 
 interface Employee {
 	id: string
@@ -77,7 +91,8 @@ export default function EmployeeManagement() {
 		pageSize: 5,
 	})
 	const [sorting, setSorting] = useState<SortingState>([])
-	
+	const [isPending, startTransition] = useTransition()
+
 	// Mock data para archivos de empleados
 	const [employeeFiles, setEmployeeFiles] = useState<Record<string, EmployeeFile[]>>({
 		"1": [
@@ -87,7 +102,7 @@ export default function EmployeeManagement() {
 				type: "PDF",
 				size: "2.3 MB",
 				uploadDate: "2023-01-20",
-				uploadedBy: "Admin"
+				uploadedBy: "Admin",
 			},
 			{
 				id: "f2",
@@ -95,8 +110,8 @@ export default function EmployeeManagement() {
 				type: "PDF",
 				size: "1.1 MB",
 				uploadDate: "2023-01-20",
-				uploadedBy: "RRHH"
-			}
+				uploadedBy: "RRHH",
+			},
 		],
 		"2": [
 			{
@@ -105,9 +120,9 @@ export default function EmployeeManagement() {
 				type: "PDF",
 				size: "2.5 MB",
 				uploadDate: "2022-11-25",
-				uploadedBy: "Admin"
-			}
-		]
+				uploadedBy: "Admin",
+			},
+		],
 	})
 
 	const mockEmployees: Employee[] = [
@@ -173,18 +188,22 @@ export default function EmployeeManagement() {
 		},
 	]
 
-	// Safe filtering that won't crash during server-side rendering
-	const filteredEmployees = mockEmployees
-		? mockEmployees.filter(
-				(employee) =>
-					employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					employee.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					employee.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
-			)
-		: []
+	// Safe filtering that won't crash during server-side rendering - memoizado
+	const filteredEmployees = useMemo(
+		() =>
+			mockEmployees
+				? mockEmployees.filter(
+						(employee) =>
+							employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+							employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+							employee.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+							employee.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
+					)
+				: [],
+		[searchQuery]
+	)
 
-	const getStatusColor = (status: string) => {
+	const getStatusColor = useCallback((status: string) => {
 		switch (status) {
 			case "activo":
 				return "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800"
@@ -195,29 +214,33 @@ export default function EmployeeManagement() {
 			default:
 				return "bg-muted text-muted-foreground"
 		}
-	}
+	}, [])
 
-	const getInitials = (name: string) => {
+	const getInitials = useCallback((name: string) => {
 		return name
 			.split(" ")
 			.map((n) => n[0])
 			.join("")
 			.toUpperCase()
 			.slice(0, 2)
-	}
+	}, [])
 
 	// Safe role check with fallback for server-side rendering
 	const canManageEmployees = true
 
-	// Handlers memoizados para evitar re-renders innecesarios
+	// Handlers memoizados para evitar re-renders innecesarios con transiciones no-bloqueantes
 	const handleEditEmployee = useCallback((employee: Employee) => {
-		setSelectedEmployee(employee)
-		setEditEmployeeDialog(true)
+		startTransition(() => {
+			setSelectedEmployee(employee)
+			setEditEmployeeDialog(true)
+		})
 	}, [])
 
 	const handleViewFiles = useCallback((employee: Employee) => {
-		setSelectedEmployee(employee)
-		setViewFilesDialog(true)
+		startTransition(() => {
+			setSelectedEmployee(employee)
+			setViewFilesDialog(true)
+		})
 	}, [])
 
 	const columns = useMemo<ColumnDef<Employee>[]>(
@@ -230,12 +253,12 @@ export default function EmployeeManagement() {
 					const initials = getInitials(employee.name)
 					return (
 						<div className="flex items-center gap-3">
-							<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+							<div className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
 								{initials}
 							</div>
 							<div>
-								<p className="font-medium text-foreground">{employee.name}</p>
-								<p className="text-xs text-muted-foreground">{employee.employeeId}</p>
+								<p className="text-foreground font-medium">{employee.name}</p>
+								<p className="text-muted-foreground text-xs">{employee.employeeId}</p>
 							</div>
 						</div>
 					)
@@ -253,12 +276,12 @@ export default function EmployeeManagement() {
 					const employee = info.row.original
 					return (
 						<div className="space-y-1">
-							<div className="flex items-center text-xs text-foreground">
-								<Mail className="mr-1.5 h-3 w-3 text-muted-foreground" />
+							<div className="text-foreground flex items-center text-xs">
+								<Mail className="text-muted-foreground mr-1.5 h-3 w-3" />
 								{employee.email}
 							</div>
-							<div className="flex items-center text-xs text-foreground">
-								<Phone className="mr-1.5 h-3 w-3 text-muted-foreground" />
+							<div className="text-foreground flex items-center text-xs">
+								<Phone className="text-muted-foreground mr-1.5 h-3 w-3" />
 								{employee.phone}
 							</div>
 						</div>
@@ -313,8 +336,8 @@ export default function EmployeeManagement() {
 				cell: (info) => {
 					const date = info.getValue() as string
 					return (
-						<div className="flex items-center text-foreground">
-							<Calendar className="mr-1.5 h-3 w-3 text-muted-foreground" />
+						<div className="text-foreground flex items-center">
+							<Calendar className="text-muted-foreground mr-1.5 h-3 w-3" />
 							<span>{date}</span>
 						</div>
 					)
@@ -335,7 +358,11 @@ export default function EmployeeManagement() {
 								return (
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
-											<Button variant="ghost" size="sm" className="rounded-lg transition-all duration-150">
+											<Button
+												variant="ghost"
+												size="sm"
+												className="rounded-lg transition-all duration-150"
+											>
 												<MoreHorizontal className="h-4 w-4" />
 											</Button>
 										</DropdownMenuTrigger>
@@ -358,7 +385,7 @@ export default function EmployeeManagement() {
 												<FileText className="mr-2 h-4 w-4" />
 												Gestionar Archivos
 											</DropdownMenuItem>
-											<DropdownMenuItem 
+											<DropdownMenuItem
 												className="text-red-600 dark:text-red-400"
 												onSelect={(e) => {
 													e.preventDefault()
@@ -378,10 +405,10 @@ export default function EmployeeManagement() {
 								cellClassName: "",
 							},
 						} as ColumnDef<Employee>,
-				  ]
+					]
 				: []),
 		],
-		[canManageEmployees, handleEditEmployee, handleViewFiles]
+		[canManageEmployees, handleEditEmployee, handleViewFiles, getStatusColor, getInitials]
 	)
 
 	const table = useReactTable({
@@ -401,19 +428,44 @@ export default function EmployeeManagement() {
 		getSortedRowModel: getSortedRowModel(),
 	})
 
-	const departmentStats = [
-		{ name: "Ingeniería", count: 45, color: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-800" },
-		{ name: "Marketing", count: 23, color: "bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border-purple-200 dark:border-purple-800" },
-		{ name: "Finanzas", count: 18, color: "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800" },
-		{ name: "Recursos Humanos", count: 12, color: "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400 border-orange-200 dark:border-orange-800" },
-	]
+	const departmentStats = useMemo(
+		() => [
+			{
+				name: "Ingeniería",
+				count: 45,
+				color:
+					"bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+			},
+			{
+				name: "Marketing",
+				count: 23,
+				color:
+					"bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+			},
+			{
+				name: "Finanzas",
+				count: 18,
+				color:
+					"bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400 border-green-200 dark:border-green-800",
+			},
+			{
+				name: "Recursos Humanos",
+				count: 12,
+				color:
+					"bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+			},
+		],
+		[]
+	)
 
 	return (
 		<div className="space-y-8">
 			<div className="flex items-center justify-between">
 				<div className="space-y-2">
-					<h1 className="text-3xl font-bold text-foreground">Gestión de Colaboradores</h1>
-					<p className="text-muted-foreground">Gestionar información y registros de colaboradores</p>
+					<h1 className="text-foreground text-3xl font-bold">Gestión de Colaboradores</h1>
+					<p className="text-muted-foreground">
+						Gestionar información y registros de colaboradores
+					</p>
 				</div>
 				{canManageEmployees && (
 					<Dialog open={addEmployeeDialog} onOpenChange={setAddEmployeeDialog}>
@@ -487,16 +539,20 @@ export default function EmployeeManagement() {
 			<div className="grid grid-cols-12 gap-6">
 				{departmentStats.map((dept, index) => (
 					<div key={index} className="col-span-12 md:col-span-6 lg:col-span-3">
-						<Card className="rounded-2xl border-muted shadow-sm transition-all duration-150 hover:shadow-md hover:-translate-y-0.5">
+						<Card className="border-muted rounded-2xl shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
 							<CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-								<div className="space-y-1 flex-1">
-									<CardTitle className="text-xs font-medium text-muted-foreground">{dept.name}</CardTitle>
-									<div className="text-2xl font-bold text-foreground">{dept.count}</div>
+								<div className="flex-1 space-y-1">
+									<CardTitle className="text-muted-foreground text-xs font-medium">
+										{dept.name}
+									</CardTitle>
+									<div className="text-foreground text-2xl font-bold">{dept.count}</div>
 								</div>
-								<Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+								<Users className="text-muted-foreground h-4 w-4 shrink-0" />
 							</CardHeader>
 							<CardContent className="pt-0">
-								<Badge className={`${dept.color} rounded-full border text-xs font-medium`}>Activo</Badge>
+								<Badge className={`${dept.color} rounded-full border text-xs font-medium`}>
+									Activo
+								</Badge>
 							</CardContent>
 						</Card>
 					</div>
@@ -511,14 +567,14 @@ export default function EmployeeManagement() {
 			/>
 
 			{/* Employee Table */}
-			<Card className="rounded-2xl border-muted shadow-sm">
+			<Card className="border-muted rounded-2xl shadow-sm">
 				<CardHeader>
-					<CardTitle className="flex items-center text-base font-semibold text-foreground">
+					<CardTitle className="text-foreground flex items-center text-base font-semibold">
 						<Users className="mr-2 h-5 w-5" />
 						Directorio de Colaboradores
 					</CardTitle>
 				</CardHeader>
-				<CardContent>
+				<CardContent style={{ opacity: isPending ? 0.6 : 1, transition: "opacity 0.2s" }}>
 					<DataGrid
 						table={table}
 						recordCount={filteredEmployees?.length || 0}
@@ -627,8 +683,8 @@ export default function EmployeeManagement() {
 					</DialogHeader>
 					{selectedEmployee && (
 						<div className="space-y-4">
-							<div className="flex justify-between items-center">
-								<div className="flex items-center gap-2 text-sm text-muted-foreground">
+							<div className="flex items-center justify-between">
+								<div className="text-muted-foreground flex items-center gap-2 text-sm">
 									<FileText className="h-4 w-4" />
 									<span>
 										{employeeFiles[selectedEmployee.id]?.length || 0} archivo(s) disponible(s)
@@ -646,20 +702,20 @@ export default function EmployeeManagement() {
 								</Button>
 							</div>
 
-							<div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
+							<div className="max-h-[400px] divide-y overflow-y-auto rounded-lg border">
 								{employeeFiles[selectedEmployee.id]?.length > 0 ? (
 									employeeFiles[selectedEmployee.id].map((file) => (
 										<div
 											key={file.id}
-											className="p-4 hover:bg-muted/50 transition-colors flex items-center justify-between"
+											className="hover:bg-muted/50 flex items-center justify-between p-4 transition-colors"
 										>
-											<div className="flex items-center gap-3 flex-1">
-												<div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-													<FileText className="h-5 w-5 text-primary" />
+											<div className="flex flex-1 items-center gap-3">
+												<div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
+													<FileText className="text-primary h-5 w-5" />
 												</div>
 												<div className="flex-1">
-													<p className="font-medium text-foreground">{file.name}</p>
-													<div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+													<p className="text-foreground font-medium">{file.name}</p>
+													<div className="text-muted-foreground mt-1 flex items-center gap-3 text-xs">
 														<span>{file.type}</span>
 														<span>•</span>
 														<span>{file.size}</span>
@@ -680,14 +736,13 @@ export default function EmployeeManagement() {
 												<Button
 													variant="ghost"
 													size="sm"
-													className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+													className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
 													onClick={() => {
 														// Eliminar archivo
 														setEmployeeFiles((prev) => ({
 															...prev,
-															[selectedEmployee.id]: prev[selectedEmployee.id]?.filter(
-																(f) => f.id !== file.id
-															) || []
+															[selectedEmployee.id]:
+																prev[selectedEmployee.id]?.filter((f) => f.id !== file.id) || [],
 														}))
 													}}
 												>
@@ -697,10 +752,10 @@ export default function EmployeeManagement() {
 										</div>
 									))
 								) : (
-									<div className="p-8 text-center text-muted-foreground">
-										<FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+									<div className="text-muted-foreground p-8 text-center">
+										<FileText className="mx-auto mb-3 h-12 w-12 opacity-50" />
 										<p>No hay archivos disponibles</p>
-										<p className="text-sm mt-1">Sube un archivo para comenzar</p>
+										<p className="mt-1 text-sm">Sube un archivo para comenzar</p>
 									</div>
 								)}
 							</div>
@@ -740,12 +795,12 @@ export default function EmployeeManagement() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="fileUpload">Archivo</Label>
-							<div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-								<Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-								<p className="text-sm text-muted-foreground mb-1">
+							<div className="hover:bg-muted/50 cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors">
+								<Upload className="text-muted-foreground mx-auto mb-2 h-8 w-8" />
+								<p className="text-muted-foreground mb-1 text-sm">
 									Haz clic para seleccionar o arrastra el archivo aquí
 								</p>
-								<p className="text-xs text-muted-foreground">PDF, DOC, DOCX hasta 10MB</p>
+								<p className="text-muted-foreground text-xs">PDF, DOC, DOCX hasta 10MB</p>
 								<Input id="fileUpload" type="file" className="hidden" />
 							</div>
 						</div>
@@ -762,15 +817,12 @@ export default function EmployeeManagement() {
 											name: "Nuevo_Documento.pdf",
 											type: "PDF",
 											size: "1.5 MB",
-											uploadDate: new Date().toISOString().split('T')[0],
-											uploadedBy: "Usuario Actual"
+											uploadDate: new Date().toISOString().split("T")[0],
+											uploadedBy: "Usuario Actual",
 										}
 										setEmployeeFiles((prev) => ({
 											...prev,
-											[selectedEmployee.id]: [
-												...(prev[selectedEmployee.id] || []),
-												newFile
-											]
+											[selectedEmployee.id]: [...(prev[selectedEmployee.id] || []), newFile],
 										}))
 									}
 									setUploadFileDialog(false)
